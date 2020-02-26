@@ -1,4 +1,4 @@
-# ------------------------------------------------------
+#==============Importing libraries =====================
 from bs4 import BeautifulSoup
 import requests
 import pandas as pd
@@ -7,7 +7,7 @@ import xmltodict
 import datetime
 import os
 import time
-# ------------------------------------------------------
+#========================================================
 datafilenamepath = "C:\\Users\\edidd\\Documents\\Ubiqum\\Data Analytics Course\\Project_Heike2\\Data"
 
 #---------------- API: user data ------------------
@@ -43,9 +43,9 @@ for i, dic in enumerate(parameters):
 parameters[0]["alias"]
 
 #Checking NAs
-parameters_df.isnull().any().any()
+parameters_df_195.isnull().any().any()
 
-#Inlcude if/else in order to account for the possibility of NAs
+#Include if/else in order to account for the possibility of NAs
 
 #=============== Registers: parsing of registers for all parameters ===========
 # Setting dates
@@ -139,8 +139,7 @@ df_397.to_csv(os.path.join(datafilenamepath, "397_df_2019-01_to_2019-09.csv"), i
 # df_2020_01.info()
 
 # =========== Parsing infoloc ===================
-# infoloc_url = api_url + user + "/" + password + "/" + "infoloc"
-infoloc_url = "https://sgclima.indoorclima.com/api.php/uk9JVfRAyK/jFC4u5jj3megxXp/infoloc"
+infoloc_url = api_url + user + "/" + password + "/" + "infoloc"
 
 # Sending request to the url
 infoloc_response = requests.get(infoloc_url)
@@ -192,6 +191,11 @@ col_names = ["valor", "data", "hora", "ps_id"]
 
 for i in col_names:
 	registers_df[i] = [x.get_text() for x in registers_soup.find_all(i)]
+
+#--------- Try something...
+print(registers_soup.get_text())
+
+#--------------
 
 #--------- Creating dictionary from XML ----------
 # This methos is slower but doesn't need the dictionaries to have the same structure (like in the previous method).
