@@ -68,3 +68,9 @@ extract_data("195", "2019-01-01", "2019-09-30")
 extract_data("96", "2015-01-01", "2020-02-19")
 extract_data("508", "2015-01-01", "2020-02-19")
 extract_data("195", "2015-01-01", "2018-12-31")
+extract_data("195", "2020-02-01", "2020-02-29")
+
+#============= Trials to for optimized variable naming ==============
+parameters_df_195.to_csv(os.path.join(datafilenamepath, "parameters_195.csv"), index= None, header= True)
+parameters_df_508.to_csv(os.path.join(datafilenamepath, "parameters_508.csv"), index= None, header= True)
+parameters_df_397.to_csv(os.path.join(datafilenamepath, "parameters_397.csv"), index= None, header= True)

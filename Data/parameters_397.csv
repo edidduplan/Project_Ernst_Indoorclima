@@ -1,0 +1,30 @@
+loc_id,alias,cont_desc,familia,subfamilia,origen,ps_id,objetivo,features
+397,Paro - marcha,0,Control,marcha_paro,1_maq,20,0,
+397,Verano - invierno,0,Control,modo_func,instalacion,21,0,
+397,% compuerta exterior,0,Control,compuerta,1_maq,24,0,x
+397,Alarma,0,Control,alarma,1_maq,98,0,
+397,Filtro sucio,0,Control,filtro,instalacion,147,0,
+397,Algoritmos,0,Control,algoritmos,instalacion,544,0,
+397,Verano - Invierno Tienda,0,Control,modo_func,instalacion,955,0,x
+397,Rooftop,0,flujo,energia_activa,1_maq,3,0,
+397,Energía Contador,0,flujo,energia_activa,instalacion,695,0,
+397,Humedad interior,0,otros_params_fisicos,humedad,instalacion,624,0,
+397,Humedad exterior,0,otros_params_fisicos,humedad,instalacion,625,0,
+397,CO2,0,otros_params_fisicos,co2,instalacion,627,0,
+397,Potencia Rooftop,0,potencia,electrica_activa,instalacion,1,0,x
+397,Potencia General,0,potencia,electrica_activa,instalacion,781,0,
+397,Presión Alta C1,0,presiones,alta_c1,1_maq,9,0,x
+397,Presión Baja C1,0,presiones,baja_c1,1_maq,10,0,x
+397,Presión Alta C2,0,presiones,alta_c2,1_maq,11,0,x
+397,Presión Baja C2,0,presiones,baja_c2,1_maq,12,0,x
+397,Presión Alta C3,0,presiones,alta_c3,1_maq,645,0,x
+397,Presión Alta C4,0,presiones,alta_c4,1_maq,646,0,x
+397,Presión Baja C3,0,presiones,baja_c3,instalacion,647,0,x
+397,Presión Baja C4,0,presiones,baja_c4,instalacion,648,0,x
+397,Tª exterior,0,temperaturas,exterior,instalacion,13,0,x
+397,Tª interior,0,temperaturas,interior,instalacion,14,1,
+397,Tª impulsión,0,temperaturas,impulsion,1_maq,15,0,x
+397,Tª retorno,0,temperaturas,retorno,1_maq,16,0,x
+397,Tª SET verano,0,temperaturas,consigna_v,1_maq,22,0,
+397,Tª SET invierno,0,temperaturas,consigna_i,1_maq,23,0,
+397,Tª consigna activa,0,temperaturas,consigna,instalacion,950,0,

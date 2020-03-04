@@ -18,7 +18,7 @@ api_url = "https://sgclima.indoorclima.com/api.php/"
 #================ Parameters ===============
 
 #---------- Defining location -----------------
-loc_id = "195"
+loc_id = "508"
 #---------------------------------------------------------
 
 parameters_url = api_url + user + "/" + password + "/" + "parameters?id=" + loc_id
@@ -34,16 +34,19 @@ parameters_dic = xmltodict.parse(parameters_response.content)
 # Navigating down in the dictionary to get to the registers level
 parameters = parameters_dic["info_sgclima"]["parameter"]
 
-parameters_df_195 = pd.DataFrame()
+parameters_df_508 = pd.DataFrame()
 for i, dic in enumerate(parameters):
 	for key, value in dic.items():
-		parameters_df_195.loc[i, str(key)] = value
+		parameters_df_508.loc[i, str(key)] = value
 
-# Dropping parameters not needed for the model
-parameters[0]["alias"]
+# Selection and naming of features based on parameters xml
+parameters_df_508 = pd.DataFrame()
+for i, dic in enumerate(parameters):
+	for key, value in dic.items():
+		parameters_df_508.loc[i, str(key)] = value
 
 #Checking NAs
-parameters_df_195.isnull().any().any()
+parameters_df_508.isnull()
 
 #Include if/else in order to account for the possibility of NAs
 
