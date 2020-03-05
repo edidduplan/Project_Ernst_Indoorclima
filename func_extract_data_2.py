@@ -7,6 +7,7 @@ import xmltodict
 import datetime
 import os
 import time
+import re
 
 #================File path =====================
 datafilenamepath = "C:\\Users\\edidd\\Documents\\Ubiqum\\Data Analytics Course\\Project_Heike2\\Data"
@@ -30,18 +31,39 @@ def extract_data(loc_id, data_ini, data_fi):
     df_dic = {}
     for n, par in enumerate(parameters):
         # if {par["alias"]}.intersection(para_to_drop) == set():
-        ps_id = par["ps_id"]
-        alias = par["alias"]
-        registers_url = api_url + user + "/" + password + "/" + "registers?id=" + loc_id + "&ps_id=" + ps_id + "&data_ini=" + data_ini + "&data_fi=" + data_fi
-        registers_response = requests.get(registers_url)
-        registers_soup = BeautifulSoup(registers_response.text, 'lxml')
-        col_names = ["valor", "data", "hora", "ps_id"]
-        registers_df = pd.DataFrame()
-        for i in col_names:
-            registers_df[i] = [x.get_text() for x in registers_soup.find_all(i)]
-        df_dic[alias] = registers_df
+        # Loading attributes from parameters
+        ps_id = str(par["ps_id"])
+        familia = str(par["familia"])
+        subfamilia = str(par["subfamilia"])
+        origen = str(par["origen"])
+        objetivo = str(par["objetivo"])
+        # Rules to select variables
+        origen_rule = re.findall("_maq|instalacion", str(par["origen"]))[0] if re.findall("_maq|instalacion", str(par["origen"])) else ""
+        rule1 = {familia}
+        rule2 = {familia + subfamilia}
+        rule3 = {familia + subfamilia + origen_rule}
+        rule4 = {familia + subfamilia + origen_rule + ps_id}
+        rule5 = {objetivo}
+        # Set of rules to select only relevant parameters: features
+        rules = {"Controlmodo_func", "Controlcompuerta_maq", "potenciaelectrica_activainstalacion1",
+                 "potenciaelectrica_activainstalacion900", "potenciaelectrica_activa_maq", "presiones",
+                 "temperaturasexterior", "temperaturasimpulsion_maq", "temperaturasretorno_maq", "1"}
+        if (rule1.intersection(rules) != set()) | \
+                (rule2.intersection(rules) != set()) | \
+                (rule3.intersection(rules) != set()) | \
+                (rule4.intersection(rules) != set()) | \
+                (rule5.intersection(rules) != set()):
+            # Registers
+            registers_url = api_url + user + "/" + password + "/" + "registers?id=" + loc_id + "&ps_id=" + ps_id + "&data_ini=" + data_ini + "&data_fi=" + data_fi
+            registers_response = requests.get(registers_url)
+            registers_soup = BeautifulSoup(registers_response.text, 'lxml')
+            col_names = ["valor", "data", "hora", "ps_id"]
+            registers_df = pd.DataFrame()
+            for i in col_names:
+                registers_df[i] = [x.get_text() for x in registers_soup.find_all(i)]
+            # Naming variables
+            df_dic[familia + "_" + subfamilia + "_" + origen + "_" + ps_id + "_" + objetivo] = registers_df
         print(str(n + 1), "/", str(len(parameters)))
-    print("--- %s seconds ---" % (time.time() - start_time))
     # Changing data types and generating datetime column
     for i, df in df_dic.items():
         df["datetime"] = df["data"] + df["hora"]
@@ -62,6 +84,7 @@ def extract_data(loc_id, data_ini, data_fi):
     df_merge.to_csv(os.path.join(
         datafilenamepath,
         (loc_id + "_df" + "_" + data_ini +"_to_" + data_fi + ".csv")), index=None, header=True)
+    print("--- %s seconds ---" % (time.time() - start_time))
 
 #============== Getting the csv's ==============
 extract_data("195", "2019-01-01", "2019-09-30")
@@ -69,8 +92,5 @@ extract_data("96", "2015-01-01", "2020-02-19")
 extract_data("508", "2015-01-01", "2020-02-19")
 extract_data("195", "2015-01-01", "2018-12-31")
 extract_data("195", "2020-02-01", "2020-02-29")
-
-#============= Trials to for optimized variable naming ==============
-parameters_df_195.to_csv(os.path.join(datafilenamepath, "parameters_195.csv"), index= None, header= True)
-parameters_df_508.to_csv(os.path.join(datafilenamepath, "parameters_508.csv"), index= None, header= True)
-parameters_df_397.to_csv(os.path.join(datafilenamepath, "parameters_397.csv"), index= None, header= True)
+extract_data("508", "2020-02-01", "2020-02-01")
+extract_data("195", "2020-02-01", "2020-02-01")

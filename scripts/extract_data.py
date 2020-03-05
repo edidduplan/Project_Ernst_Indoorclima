@@ -7,6 +7,7 @@ import xmltodict
 import datetime
 import os
 import time
+import re
 #========================================================
 datafilenamepath = "C:\\Users\\edidd\\Documents\\Ubiqum\\Data Analytics Course\\Project_Heike2\\Data"
 
@@ -18,7 +19,7 @@ api_url = "https://sgclima.indoorclima.com/api.php/"
 #================ Parameters ===============
 
 #---------- Defining location -----------------
-loc_id = "508"
+loc_id = "195"
 #---------------------------------------------------------
 
 parameters_url = api_url + user + "/" + password + "/" + "parameters?id=" + loc_id
@@ -40,10 +41,18 @@ for i, dic in enumerate(parameters):
 		parameters_df_508.loc[i, str(key)] = value
 
 # Selection and naming of features based on parameters xml
-parameters_df_508 = pd.DataFrame()
-for i, dic in enumerate(parameters):
-	for key, value in dic.items():
-		parameters_df_508.loc[i, str(key)] = value
+ps_id = str(parameters[22]["ps_id"])
+familia = str(parameters[22]["familia"])
+subfamilia = str(parameters[22]["subfamilia"])
+origen = str(parameters[22]["origen"])
+origen_rule = re.findall("_maq|instalacion", str(parameters[22]["origen"]))[0] if re.findall("_maq|instalacion", str(parameters[22]["origen"])) else ""
+objetivo = str(parameters[22]["objetivo"])
+
+# Rules to select variables
+rule1 = {familia}
+rule2 = {familia + subfamilia}
+rule3 = {familia + subfamilia + origen_rule}
+rule4 = {familia + subfamilia + origen_rule + ps_id}
 
 #Checking NAs
 parameters_df_508.isnull()
@@ -52,8 +61,8 @@ parameters_df_508.isnull()
 
 #=============== Registers: parsing of registers for all parameters ===========
 # Setting dates
-data_ini = "2019-01-01"
-data_fi = "2019-09-30"
+data_ini = "2020-02-01"
+data_fi = "2020-02-01"
 
 para_to_drop = {"Paro - marcha", "Alarma", "Algoritmos", "Rooftop", "Energía Contador", "CO2", "Potencia General",
 				"Tª SET invierno", "Tª SET verano"}
@@ -236,5 +245,10 @@ for i, dic in enumerate(registers):
 
 #Checking NAs
 registers_df.isnull().any().any()
+
+# Copying list of parameters for the available locations ==============
+parameters_df_195.to_csv(os.path.join(datafilenamepath, "parameters_195.csv"), index= None, header= True)
+parameters_df_508.to_csv(os.path.join(datafilenamepath, "parameters_508.csv"), index= None, header= True)
+parameters_df_397.to_csv(os.path.join(datafilenamepath, "parameters_397.csv"), index= None, header= True)
 
 
