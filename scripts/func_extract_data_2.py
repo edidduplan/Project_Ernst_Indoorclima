@@ -13,12 +13,13 @@ import time
 import re
 
 #================File path =====================
-datafilenamepath = "" # File path where the extracted data will be copied
+datafilenamepath = "/Data" # File path where the extracted data will be copied
 
 #=============== API: user data ================
-password = ""
-user = ""
-api_url = ""
+apiUserData = pd.read_csv(os.path.join(os.getcwd(), "scripts", "userdata.csv"), index_col= 0)
+password = apiUserData.loc["password"].values[0]
+user = apiUserData.loc["user"].values[0]
+api_url = apiUserData.loc["api_url"].values[0]
 
 #============== Function: extract data ==============
 def extract_data(loc_id, data_ini, data_fi):
@@ -83,11 +84,13 @@ def extract_data(loc_id, data_ini, data_fi):
             df_merge = pd.merge(df_merge, dic[1], how="outer", on="datetime")
     # Sorting df on datetime
     df_merge = df_merge.sort_values("datetime")
+    df_merge.set_index("datetime", inplace= True)
     # Writing csv
-    df_merge.to_csv(os.path.join(
-        datafilenamepath,
-        (loc_id + "_df" + "_" + data_ini +"_to_" + data_fi + ".csv")), index=None, header=True)
+    #df_merge.to_csv(os.path.join(
+    #    datafilenamepath,
+    #    (loc_id + "_df" + "_" + data_ini +"_to_" + data_fi + ".csv")), index=None, header=True)
     print("--- %s seconds ---" % (time.time() - start_time))
+    return df_merge
 
 #============== Getting the csv's ==============
 extract_data("195", "2019-01-01", "2019-09-30")
@@ -96,4 +99,4 @@ extract_data("508", "2015-01-01", "2020-02-19")
 extract_data("195", "2015-01-01", "2018-12-31")
 extract_data("195", "2020-02-01", "2020-02-29")
 extract_data("508", "2020-02-01", "2020-02-01")
-extract_data("195", "2020-02-01", "2020-02-01")
+df_FuncExtrData2= extract_data("195", "2020-01-01", "2020-01-31")
