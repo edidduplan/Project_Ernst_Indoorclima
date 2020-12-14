@@ -3,9 +3,12 @@
 # - Consider folder structure
 # - Read inercia2 de API:
 #   + verano / invierno
-#   + x0: registros para ps_id seleccionados (feature selection)
+#   + ultimos registros para todos los ps_id
 #   + Status on/off (parada / arranque) --> from value of power from registros
 # - Load log.csv
+# - Read infoloc
+#   + power_on
+#   + power_off
 # - x0
 #   + read cli_id from command line
 #   + read parameters from API
@@ -68,13 +71,13 @@ from sklearn.model_selection import GridSearchCV
 from joblib import dump, load
 
 #=============== API: user data ================
-password = "jFC4u5jj3megxXp"
-user = "uk9JVfRAyK"
-#user = "uk9JVfRAhT"
-api_url = "http://sgclima.indoorclima.com/api.php/"
+apiUserData = pd.read_csv(os.path.join(os.getcwd(), "userdata.csv"), index_col= 0)
+password = apiUserData.loc["password"].values[0]
+user = apiUserData.loc["user"].values[0]
+api_url = apiUserData.loc["api_url"].values[0]
 
 #----------------------------- Fetching inercia2 -----------------------------
-def read_inercia2(cli_id):
+def read_registers(cli_id):
     inercia2_url = api_url + user + "/" + password + "/" + "inercia2?id=" + str(cli_id)
     # Sending request to the url
     response = requests.get(inercia2_url)
@@ -85,86 +88,150 @@ def read_inercia2(cli_id):
     # Extracting x0
     registers = pd.DataFrame()
     for i, param in enumerate(inercia2_dic):
-        ps_id = "p_" + str(param["ps_id"])
-        registers.loc[0, ps_id] = param["valor"]
-    return registers
+        ps_id = str(param["ps_id"])
+        loc_id = str(param["loc_id"])
+        registers.loc[0, ps_id + "_" + loc_id] = param["valor"]
+    return registers.astype("float64")
 
-def read_infoloc():
-    infoloc_url = api_url + user + "/" + password + "/" + "infoloc"
+
+def state_installation(registers, power_on, power_off, features_names):
+    # Getting current potencia
+    pattern_pot = "p\d+_"
+    potencia_ps_id = False
+    for feature in features_names:
+        if re.search(pattern_pot, feature) is not None:
+            potencia_ps_id = feature
+    potencia_actual = ""
+    if potencia_ps_id:
+        potencia_actual = registers[potencia_ps_id[1:]][0]
+    else:
+        print("No feature marked with p")
+    # Finding the current state of the installation
+    if potencia_actual is not "":
+        ver_inv = registers.filter(regex= ("ver-inv.*")).iloc[0,0]
+        if ver_inv == 0:
+            pattern = "ver_"
+        else:
+            pattern = "inv_"
+        if potencia_actual < power_off:
+            pattern = pattern + "arranque"
+        else:
+            if potencia_actual > power_on:
+                pattern = pattern + "parada"
+            else:
+                print("Current state of installation is undefined")
+                pattern = False
+    else:
+        pattern = False
+    return pattern
+
+
+def standardize_x0(registers, std_df):
+    # set x0 based on registers and variables in std_df
+    features_names = std_df.keys().to_list()
+    x0 = pd.DataFrame()
+    x0_std = pd.DataFrame()
+    for feature in features_names:
+        pattern = "\d+_\d+"
+        psid_locid = re.search(pattern, feature)[0]
+        print(feature, "\n", psid_locid)
+        x0.loc[0, psid_locid] = registers.loc[0, psid_locid]
+        x0_std.loc[0, psid_locid] = (registers.loc[0, psid_locid] - std_df.loc["mean", feature]) / std_df.loc["std", feature]
+    return x0_std
+
+
+def read_power_thresholds(cli_id):
+    url = api_url + user + "/" + password + "/" + "infocli?id=" + str(cli_id)
     # Sending request to the url
-    response = requests.get(infoloc_url)
+    response = requests.get(url)
     # Parsing ordered dictionary with xmltodic
     infoloc_dic = xmltodict.parse(response.content)
     # Navigating down in the dictionary to get to the registers level
-    infoloc_dic = infoloc_dic["info_sgclima"]["infoloc"]
-    # For loop to construct df based on "keys"
-    infoloc_df = pd.DataFrame()
-    for i, dic in enumerate(infoloc_dic):
-        for key, value in dic.items():
-            infoloc_df.loc[i, str(key)] = value
-    return infoloc_df
+    infos = infoloc_dic["info_sgclima"]["infocli"]
+    power_on = 50 #infos["pot_arranque"]
+    power_off = 10 #infos["pot_parada"]
+    return power_on, power_off
 
-def status_on_off(registers, infoloc, cli_id):
-    ps_id_pot_posible = {"p_900"}
-    registers_cols = set(registers.columns)
-    ps_id_pot = registers_cols.intersection(ps_id_pot_posible)
-    pot_0 = registers[list(ps_id_pot)[0]]
-    pot_arranque = infoloc.loc[str(cli_id), "pot_arranque"]
-    pot_parada = infoloc.loc[str(cli_id), "pot_parada"]
-    if pot_0 >= pot_arranque:
-        on_off = 1
+
+def feature_selection(cli_id, filepath_models):
+    # Setting up where to look for the std_csv
+    complete_path_model = os.path.join(os.getcwd(), filepath_models)
+    file_list = os.listdir(complete_path_model)
+    # Looking for the std_csv as per cli_id
+    pattern_std = "\D+" + str(cli_id) + "_standardization_dt05"
+    filename_std = False
+    for f in file_list:
+        if re.search(pattern_std, f) is not None:
+            filename_std = f
+    std_df = pd.DataFrame()
+    if filename_std:
+        std_df = pd.read_csv(os.path.join(complete_path_model, filename_std), index_col = 0)
     else:
-        on_off = 0
-    return on_off
-
-
-def get_x0(registers, inercia):
-    # - Are the ps_id's from inercia 2 the feature selection sub-set?
-    # - Look for pot_promedio en inercia ?
-    # - Concatenate feature selection with pot_promedio. Features most be sorted the same as in the training set.
-    # Complete function
-    return x0
-
-def standardize_x0(x0, standard_csv):
-    std_df = pd.read_csv(standard_csv)
-    x0_std = (x0 - std_df.loc["mean"]) / std_df.loc["std"]
-    return x0_std
-
-def main(cli_id):
-    # Getting parameters and x0
-    registers = read_inercia2(cli_id)
-    infoloc = read_infoloc()
-    ps_id_potencia = {900}
-    ver_inv = registers["p_ver-inv"]
-    x0 = get_x0(registers)
-    on_off = status_on_off(registers, infoloc, cli_id)
-    # --------------------------------------------------
-    # Set working directory
-    if on_off == 1:
-        if ver_inv == 1:
-            fit_file_path = os.path.join("parada", "verano", "fit")
-        else:
-            fit_file_path = os.path.join("parada", "invierno", "fit")
+        print(pattern_std, ": no standardization file available")
+    if not std_df.empty:
+        features_names = std_df.columns.to_list()
     else:
-        if ver_inv == 1:
-            fit_file_path = os.path.join("arranque", "verano", "fit")
-        else:
-            fit_file_path = os.path.join("arranque", "invierno", "fit")
-    # --------------------------------------------------
-    # For each DTx:
-    var_index = ["05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55", "60"]
-    # Creates prediction dataframe
-    prediction = pd.DataFrame()
-    for i in var_index:
-        # Load model fit
-        fit = load(os.path.join(fit_file_path, "fit_dt" + i))
-        # Standardize x0
-        standard_csv = pd.read_csv(os.path.join(fit_file_path, "standardization_dt" + i))
-        x0_std = standardize_x0(x0, standard_csv)
-        # Predict on x0_std
-        prediction.loc["y0_hat", "DT" + i] = fit.predict(x0_std)
-    # Dump prediction dataframe into csv
-    prediction.to_csv("prediction.csv", index= True, header= True)
+        features_names = False
+    return features_names
+
+
+def lookfor_models(pattern, dt, filepath_models):
+    # Setting up where to look for the models
+    complete_path_model = os.path.join(os.getcwd(), filepath_models)
+    file_list = os.listdir(complete_path_model)
+    # Looking for the models as per value of "pattern"
+    pattern_fit = pattern + "_fit_dt" + dt
+    pattern_std = pattern + "_standardization_dt" + dt
+    filename_fit = False
+    filename_std = False
+    for f in file_list:
+        if re.search(pattern_fit, f) is not None:
+            filename_fit = f
+        if re.search(pattern_std, f) is not None:
+            filename_std = f
+    fit = False
+    std_df = pd.DataFrame()
+    if filename_fit:
+        fit = load(os.path.join(complete_path_model, filename_fit))
+        std_df = pd.read_csv(os.path.join(complete_path_model, filename_std), index_col = 0)
+    else:
+        print(pattern_fit + dt, ": no fit available")
+    return fit, std_df
+
+#===================================== MAIN ==============================================================
+
+def main(cli_id, loc_id, filepath_models, filepath_prediction):
+    # Getting last registers from inercia2
+    registers = read_registers(cli_id)
+    # Getting power thresholds from infoloc
+    power_on, power_off = read_power_thresholds(cli_id)
+    # Getting the current state of the instalation
+    features_names = feature_selection(cli_id, filepath_models)
+    pattern = state_installation(registers, power_on, power_off, features_names)
+    if pattern:
+        pattern = pattern + str(loc_id)
+        # Making 11 predicitons and writing csv
+        var_index = ["05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"]
+        prediction = pd.DataFrame()
+        for dt in var_index:
+            # Looking for the model and standardization
+            fit, std_df = lookfor_models(pattern, dt, filepath_models)
+            # Getting x0_std
+            if not std_df.empty:
+                x0_std= standardize_x0(registers, std_df)
+            else:
+                print(pattern, "DT", dt, ": model not available")
+            # Predicting
+            if fit:
+                print("predicting DT" + dt)
+                prediction.loc[dt + "_min", pattern + "_DT"] = fit.predict(x0_std)
+        # Dump prediction dataframe into csv
+        now = datetime.now().strftime("%Y%m%d%H%M")
+        prediction.to_csv(os.path.join(os.getcwd(), filepath_prediction,
+                                       "prediction" + str(cli_id)+ "_" + str(now) + ".csv") , index=True, header=True)
+    else:
+        print("Current operating power not found")
+        quit()
     return prediction
 
-
+main(195, 195, r"..\test\models", r"..\test\prediction")

@@ -27,6 +27,7 @@ import scipy
 import time
 from math import sqrt
 import sys
+import re
 
 # Estimators: regressors
 from sklearn.neighbors import KNeighborsRegressor
@@ -49,9 +50,13 @@ from sklearn.model_selection import GridSearchCV
 from joblib import dump, load
 
 #------------------------------------- Extract variables --------------------------------------------------------------
-def extract_features(df, p):
+def extract_features(data, p):
     # features = df.drop(list(df.filter(regex='DT\d\d')), axis =1)
+    df = data.copy()
+    df[df.shift(periods=-1, axis=1).isnull()] = np.nan
     features = df[list(df.columns.drop(list(df.filter(regex='P\d\d|DT\d\d')))) + [p]].dropna()
+    # features = df[list(df.columns.drop(list(df.filter(regex='P\d\d|DT\d\d'))))].dropna()
+    features.drop([p], axis= "columns", inplace= True)
     return features
 
 def extract_dependent(df, dt, features):
@@ -59,18 +64,6 @@ def extract_dependent(df, dt, features):
     return dependent
 
 #------------------------------------- PC transformation ------------------------------------------------
-# def pc_transform(features):
-#     # Standardize
-#     standardize = StandardScaler(with_mean=True, with_std=True).fit(features)
-#     features_std = standardize.transform(features)
-#     # PCA
-#     columns_names = []
-#     for i in range(0, len(features.columns)):
-#         columns_names.append("PC" + str(i + 1))
-#     pc = PCA().fit(features_std)
-#     pc_features = pd.DataFrame(pc.transform(features_std), columns= columns_names)
-#     output = {"standardize": standardize, "pc_components": pc.components_, "pc_features": pc_features}
-#     return output
 
 def standardize(features):
     mean = features.describe().loc["mean"]
@@ -78,38 +71,8 @@ def standardize(features):
     features_std = (features - mean) / std
     return features_std
 
-# def pc_transform(features):
-#     # Standardize
-#     mean = features.describe().loc["mean"]
-#     std = features.describe().loc["std"]
-#     features_std = (features - mean) / std
-#     # PCA
-#     columns_names = []
-#     for i in range(0, len(features.columns)):
-#         columns_names.append("PC" + str(i + 1))
-#     pc = PCA().fit(features_std)
-#     pc_features = pd.DataFrame(pc.transform(features_std), columns= columns_names)
-#     output = {"pc_components": pc.components_, "pc_features": pc_features}
-#     return output
 
-
-#-------------------------------------- Cross-validation ---------------------------------------------------
-# def pca_cross_validate(features, models, dependent):
-#     mae_df = pd.DataFrame(columns= models.keys(), index= features.columns)
-#     start_time = time.time()
-#     for column_name in features.columns:
-#         features_subset = features.loc[:, :column_name]
-#         print("feature subset: " + column_name)
-#         for key, regressor in models.items():
-#             mae_df.loc[column_name, key] = abs(cross_val_score(regressor,
-#                                                     features_subset, dependent,
-#                                                     scoring="neg_mean_absolute_error",
-#                                                     cv=10,
-#                                                     n_jobs=-1)
-#                                     ).mean()
-#             print("model: " + key)
-#     print("--- %s seconds ---" % (time.time() - start_time))
-#     return mae_df
+#-------------------------------------- Nested Cross-validation ---------------------------------------------------
 
 def get_ncv_metric(model, X, y, n_jobs, **kwargs):
     # Establisch pipeline: PCA -> model
@@ -120,7 +83,7 @@ def get_ncv_metric(model, X, y, n_jobs, **kwargs):
     param_grid = {"reduce_dim__n_components": n_components}
     for key, value in kwargs.items():
         param_grid["regressor__" + str(key)] = value
-    kf_10 = KFold(n_splits=10, shuffle=True, random_state= 42)
+    kf_10 = KFold(n_splits=10, shuffle=True, random_state= 42) # n_splits changed to 5 for testing
     grid = GridSearchCV(
         pipe,
         param_grid,
@@ -128,9 +91,9 @@ def get_ncv_metric(model, X, y, n_jobs, **kwargs):
         n_jobs= n_jobs,
         cv = kf_10,
         error_score= 0,
-        verbose= 2
+        verbose= 1
     )
-    kf_10_nested = KFold(n_splits=10, shuffle=True, random_state= 13)
+    kf_10_nested = KFold(n_splits=10 , shuffle=True, random_state= 13) # n_splits changed to 5 for testing
     nested_cv = cross_val_score(
         estimator= grid,
         X= X,
@@ -138,7 +101,7 @@ def get_ncv_metric(model, X, y, n_jobs, **kwargs):
         scoring="neg_mean_squared_error",
         cv= kf_10_nested,
         n_jobs= n_jobs,
-        verbose= 2
+        verbose= 1
     )
     return nested_cv
 
@@ -147,7 +110,7 @@ def get_ncv_metric_rf(model, X, y, n_jobs, **kwargs):
     param_grid = {}
     for key, value in kwargs.items():
         param_grid[str(key)] = value
-    kf_10 = KFold(n_splits=10, shuffle=True, random_state= 42)
+    kf_10 = KFold(n_splits=10, shuffle=True, random_state= 42) # n_splits changed to 5 for testing
     grid = GridSearchCV(
         model,
         param_grid,
@@ -155,9 +118,9 @@ def get_ncv_metric_rf(model, X, y, n_jobs, **kwargs):
         n_jobs= n_jobs,
         cv = kf_10,
         error_score= 0,
-        verbose= 2
+        verbose= 1
     )
-    kf_10_nested = KFold(n_splits=10, shuffle=True, random_state= 13)
+    kf_10_nested = KFold(n_splits=10, shuffle=True, random_state= 13) # n_splits changed to 5 for testing
     nested_cv = cross_val_score(
         estimator= grid,
         X= X,
@@ -165,26 +128,11 @@ def get_ncv_metric_rf(model, X, y, n_jobs, **kwargs):
         scoring="neg_mean_squared_error",
         cv= kf_10_nested,
         n_jobs= n_jobs,
-        verbose= 2
+        verbose= 1
     )
     return nested_cv
-#----------------------------- Selecting number of PC based on min MAE -----------------
-# def get_best_model(metrics):
-#     best_pc = {}
-#     for model, pc_mae in metrics.items():
-#         best_pc[model] = pc_mae.loc[pc_mae == pc_mae.min()]
-#     best_model = min(best_pc, key= (lambda x: best_pc[x][0]))
-#     best_model_pc = {best_model: best_pc[best_model]}
-#     return best_model_pc
 
-#----------------------------- Train and write fit to file ----------------------
-# def train(models, best_model_pc, pc_features, dependent):
-#     for key, pc in best_model_pc.items():
-#         model = models[key]
-#         x_train = pc_features.loc[:,:pc.index[0]]
-#     y_train = dependent
-#     fit = model.fit(x_train, y_train)
-#     return fit
+#----------------------------- Train functions ----------------------
 
 def train_hyp_select(model, X, y, n_jobs, **kwargs):
     # Establisch pipeline: PCA -> model
@@ -195,7 +143,7 @@ def train_hyp_select(model, X, y, n_jobs, **kwargs):
     param_grid = {"reduce_dim__n_components": n_components}
     for key, value in kwargs.items():
         param_grid["regressor__" + str(key)] = value
-    kf_10 = KFold(n_splits=10, shuffle=True, random_state= 42)
+    kf_10 = KFold(n_splits=10, shuffle=True, random_state= 42) # n_splits changed to 5 for testing
     grid = GridSearchCV(
         pipe,
         param_grid,
@@ -203,7 +151,7 @@ def train_hyp_select(model, X, y, n_jobs, **kwargs):
         n_jobs= n_jobs,
         cv = kf_10,
         error_score= 0,
-        verbose= 2,
+        verbose= 1,
         refit= True
     )
     return grid.fit(X, y)
@@ -213,7 +161,7 @@ def train_hyp_select_rf(model, X, y, n_jobs, **kwargs):
     param_grid = {}
     for key, value in kwargs.items():
         param_grid[str(key)] = value
-    kf_10 = KFold(n_splits=10, shuffle=True, random_state=42)
+    kf_10 = KFold(n_splits=10, shuffle=True, random_state=42) # n_splits changed to 5 for testing
     grid = GridSearchCV(
         model,
         param_grid,
@@ -221,22 +169,23 @@ def train_hyp_select_rf(model, X, y, n_jobs, **kwargs):
         n_jobs=n_jobs,
         cv=kf_10,
         error_score=0,
-        verbose=2,
+        verbose=1,
         refit= True
     )
     return grid.fit(X, y)
-#===================================    Main   ==========================================
-def main(csv, file_path):
-    start_time = time.time()
+
+
+def fit_writecsv(data, file_name, file_path):
+
     # Loading data
-    data = pd.read_csv(csv)
+    # data = pd.read_csv(csv)
     # Creating model variables
     svr_rbf = SVR(kernel='rbf')
     knn = KNeighborsRegressor(weights = "distance")
     rf = RandomForestRegressor(criterion='mse', max_depth=None, min_samples_split=2)
     gbtr = GradientBoostingRegressor()
     np.random.seed(31415)
-    var_index = ["05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55", "60"]
+    var_index = ["05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"]
     # Creates log file
     log = pd.DataFrame(columns= ["model", "ncv_mse"], index= [var_index])
     for i in var_index:
@@ -262,7 +211,7 @@ def main(csv, file_path):
         mse_std.append(ncv_svr.std())
         # 2) RF
         m = ["auto", "sqrt"]
-        trees = [300, 400, 500]
+        trees = [200, 400, 500]
         ncv_rf = get_ncv_metric_rf(rf, features_std, dependent, 2, max_features=m, n_estimators= trees)
         mse_mean.append(abs(ncv_rf.mean()))
         mse_std.append(ncv_rf.std())
@@ -292,31 +241,40 @@ def main(csv, file_path):
             log.loc[i, key] = value
         #----------------------------------------------------
         # Serialize model fit to file
-        dump(fit, os.path.join(file_path, "fit_dt" + i))
+        dump(fit, os.path.join(file_path, file_name + "_fit_dt" + i))
         # Dump standardization to csv
         standardization = features.describe().loc[["mean", "std"]]
-        standardization.to_csv(os.path.join(file_path, "standardization_dt" + i + ".csv"), index= True, header= True)
+        standardization.to_csv(os.path.join(file_path, file_name + "_standardization_dt" + i + ".csv"), index= True, header= True)
     now = datetime.now().strftime("%Y%m%d%H%M")
-    log.to_csv(os.path.join(file_path, "log_" + str(now) + ".csv"), index= True, header= True)
-    print("--- %s seconds ---" % (time.time() - start_time))
+    log.to_csv(os.path.join(file_path, file_name + "_log_" + str(now) + ".csv"), index= True, header= True)
+
     return log
 
+#===================================    Main   ==========================================
+
+#-----------------------------------------
+def main(loc_id, filepath_data, filepath_model):
+    start_time = time.time()
+    complete_path_data = os.path.join(os.getcwd(), filepath_data)
+    file_list = os.listdir(complete_path_data)
+    # Looping on the 4 subsets
+    subset_list = ["ver_arranque", "ver_parada", "inv_arranque", "inv_parada"]
+    for subset in subset_list:
+        pattern = subset + str(loc_id)
+        csv = False
+        for i in file_list:
+            if re.search(pattern, i) is not None:
+                csv = i
+        if csv:
+            data = pd.read_csv(os.path.join(complete_path_data, csv))
+            fit_writecsv(data, pattern, filepath_model)
+        else:
+            print(pattern, ": no csv available")
+    print("--- %s seconds ---" % (time.time() - start_time))
+
 #--------------------------------- Excecution ---------------------------------------------
-main(sys.argv[1], sys.argv[2])
+if __name__ == "__main__":
+    # main(sys.argv[1], sys.argv[2], sys.argv[3])
+    main(195, r"..\test\data", r"..\test\models")
 
 #--------------------------------- Test -----------------------------
-#------------------------------------- Loading pre-processed data ---------------------------------------
-# filenamepath = "C:\\Users\\edidd\\Documents\\Ubiqum\\Data Analytics Course\\Ernst\\data"
-# data = pd.read_csv(os.path.join(filenamepath, "arranque_195.csv"))
-# data = pd.read_csv(sys.argv[1])
-# data = pd.read_csv(os.path.join(filenamepath, "arranque_195_sin_t_obj.csv"))
-#
-# features= extract_features(data, "P15")
-# y= extract_dependent(data, "DT15", features)
-# features_std= standardize(features)
-#
-# for key, value in fit.best_params_.items():
-#     log.loc["5", key] = value
-
-
-
