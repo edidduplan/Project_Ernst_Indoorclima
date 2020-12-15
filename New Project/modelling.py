@@ -3,11 +3,15 @@
 # - Read dataset: "arranque.csv" / "parada.csv" and ver./inv., each one containing DT05, ..., DT60
 #   (12 dependent variables)
 # - For each DTx:
-#       + Sub-set features and extract DTx as dependent variable
-#       + Performs PCA
-#       + Cross-validation on PC1 ... PCn and using algorithms: SVR, 5NN and RF
-#       + Select "PCx-algorithm" pair based on min. MAE
-#       + (optional) Perform hyperparameter tunning for selected "PCx-algorithm" pair
+#       + Extract features and extract DTx as dependent variable
+#		+ Standardize features
+# 		+ Assessment of pre-selected models: SVR, KNN and RF
+#			- For SVR and KNN
+#				* Hyperparameter selection including PCA and metric in nested cv
+#			- For RF
+#				* Hyperparameter selection and metric in nested cv
+#       + Select best model based on min. MSE
+#       + Perform hyperparameter tunning for selected model on whole data
 #       + Train model
 #       + write fitted model do file
 #----------------------------------------------------------------------------------------------------------------
@@ -72,7 +76,7 @@ def standardize(features):
     return features_std
 
 
-#-------------------------------------- Nested Cross-validation ---------------------------------------------------
+#------- Model assessment functions with nested Cross-validation including hyperparameter tunning----------
 
 def get_ncv_metric(model, X, y, n_jobs, **kwargs):
     # Establisch pipeline: PCA -> model
@@ -174,6 +178,7 @@ def train_hyp_select_rf(model, X, y, n_jobs, **kwargs):
     )
     return grid.fit(X, y)
 
+#--------------------- Fit function --------------------------------------------------
 
 def fit_writecsv(data, file_name, file_path):
 
